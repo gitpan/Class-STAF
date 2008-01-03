@@ -1,8 +1,9 @@
-Class::STAF version 0.01
+Class::STAF version 0.02
 ========================
 
 This module is an OO way to Marshalling and UnMarshalling STAF data,
-inspiared by Class::DBI. 
+inspiared by Class::DBI.
+Also a warpper around STAF::Handle
 
 INSTALLATION
 

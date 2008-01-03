@@ -1,5 +1,9 @@
 Revision history for Perl extension Class::STAF.
 
+0.02  Jun 3, 2007
+    - continued.
+    - Added warpper around STAF::Handle
+
 0.01  Dec 28, 2007
 	- original version; created by Shmuel Fomberg.
 
