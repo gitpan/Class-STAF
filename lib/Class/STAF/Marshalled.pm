@@ -102,48 +102,8 @@ sub new {
         my $opt_value = shift @params;
         $self{$opt_name} = $opt_value;
     }
-    return \%self;
-}
-
-sub _convert_single {
-    my ($class, $hash_ref) = @_;
-    # convert one hash ref to a staf object
-    # (ignoring the non relevant keys)
-    my $obj = $class->new();
-    while (my ($key, $val) = each %$hash_ref) {
-        next unless exists $obj->{$key};
-        $obj->{$key} = $val;
-    }
-    return $obj;
-}
-
-sub convert {
-    my ($class, @list) = @_;
-    die "convert should have at least one paramter\n" if (@list < 1);
-    my $return_ref = 0;
-    if (@list == 1) {
-        # only one parameter
-        my $p = shift @list;
-        if (UNIVERSAL::isa($p, "HASH")) {
-            # if that parameter is a hash - convert it to a staf object
-            return $class->_convert_single($p);
-        } elsif (UNIVERSAL::isa($p, "ARRAY")) {
-            # I got a reference to an array - handle as an array.
-            @list = @$p;
-            $return_ref = 1;
-        }
-    }
-    # I have a list of hashes to convert.
-    my @new_list;
-    foreach my $hash_ref (@list) {
-        die "Will not multi-level convert\n" unless UNIVERSAL::isa($hash_ref, "HASH");
-        push @new_list, $class->_convert_single($hash_ref);
-    }
-    if ($return_ref) {
-        return \@new_list;
-    } else {
-        return @new_list;
-    }
+    my $self_ref = \%self;
+    return bless $self_ref, $class;
 }
 
 sub _internalMarshallSimpleScalar {
@@ -408,7 +368,8 @@ sub _internalUnmarshall {
             my $value = _internalUnmarshall($string_ref, $pos_ref, $class_storage);
             $object{$field_record->{key}} = $value;
         }
-        return \%object;
+        my $object_ref = \%object;
+        return bless $object_ref, 'Class::STAF::Marshalled';
     } elsif ($type eq '*') {
         my ($len1, $len2) = $$string_ref =~ /^\@SDT\/{:(\d+)::13:map-class-map\@SDT\/{:(\d+):/;
         my $prefix_len = length("\@SDT\/{:::13:map-class-map\@SDT\/{::") + length($len1) + length($len2);
@@ -535,18 +496,18 @@ __END__
 
 =head1 NAME
 
-Class::STAF::Marshalled - OO approche to Marshalling and UnMarshalling STAF data
+Class::STAF::Marshalled - an OO approach to Marshalling and UnMarshalling STAF data (http://staf.sourceforge.net/)
 
 =head1 SYNOPSIS
 
-Readying regular data to be sent:
+Preparing regular data to be sent:
 
     use Class::STAF;
     
     my $x = [ { a1=>5, a2=>6 }, "bbbb", [1, 2, 3] ];
     my $out_string = Marshall($x);
 
-Readying class data to be sent:
+Preparing class data to be sent:
 
     package STAF::Service::Var::VarInfo;
     use base qw/Class::STAF::Marshalled/;
@@ -570,9 +531,14 @@ Receiving and manipulating data:
 
 This module is an OO interface to the STAF Marshalling API, inspired by Class::DBI.
 
-This API covers handling scalars, arrays and hashs. Also it is possible to create
-classes (not mapped to Perl objects/classes) and send them. further more, it is
-possible to accept data that includes classes from the other side, manipulate it,
+Marshalling is serializing. The same job done by Storable and such, only compatible with
+the standard serializing API the the STAF framework create and understand.
+
+For more info about STAF: http://staf.sourceforge.net/
+
+This API covers handling scalars, arrays, and hashes. Use this API to create
+classes and send them; 
+accept data that includes classes from a different origin, manipulate it,
 and marshall it back with the original classes defenitions. and all this is completely
 transparant to the developer.
 
@@ -585,7 +551,7 @@ Stringify a data structure.
     $out_string1 = Marshall($single_ref);
     $out_string2 = Marshall($ref1, $ref2, ...);
 
-Can handle any array, hash or scalar that it gets by reference. If an list/array is
+Can handle any array, hash or scalar that is received by reference. If a list/array is
 passed, it is handled as if a reference to that array was passed.
 
 =head2 UnMarshall
@@ -601,41 +567,41 @@ to the opened data.
 
 Not exported by default.
 
-Accept a hash reference, and return the name of the staf-class that it instatae.
-return undef if is not a staf-class.
+Accept a hash reference, and return the name of the STAF-class that it instantiate.
+Return undef if the reference is not to a STAF-class.
 
 =head2 get_staf_fields
 
 Not exported by default.
 
-Accept a hash reference, and return the list of fields. each of the fields contain
-at least the map-key ('key') and the display-name ('display-name'). may contain
+Accept a hash reference, and return the list of fields. Each of the fields contains
+at least the map-key ('key') and the display-name ('display-name'). May contain
 a default ('default') and short name ('short') if defined.
 
 =head1 Building staf-class
 
 =head2 Defining
 
-For building a staf-class, define a package, and base it on Class::STAF::Marshalled,
-as exampled:
+For building a STAF-class, define a package and base it on Class::STAF::Marshalled,
+for example:
 
     package STAF::Service::My::FileRecord;
     use base qw/Class::STAF::Marshalled/;
 
-Will defined a staf-class named 'STAF/Service/My/FileRecord'. (names of classes
-in staf are with slashes instead of '::') then defined the members of the class:
+Will define a STAF-class named 'STAF/Service/My/FileRecord', (names of classes
+in STAF are delimited with slashes instead of '::') then define the members of the class:
 
     __PACKAGE__->field("name", "LongFileName");
     __PACKAGE__->field("size", "SizeInBytes", default=>0);
     __PACKAGE__->field("owner", "FileOwner", short=>"owner");
 
-The syntex of the command is:
+The syntax of the command is:
 
     __PACKAGE__->field(name, description [, default=>5] [, short=>"ser#"]);
 
-The first and the second parameters are the name and description of the field.
-There are two more optional named parameters default and short that is short for
-short name. (when displaying the class in formated text, it is sometimes needed)
+The first and second parameters are the name and description of the field.
+Two more optional parameters are named default and short
+(when displaying the class in formatted text, it is sometimes needed).
 
 =head2 Instancing
 
@@ -643,23 +609,33 @@ Simple.
 
     $filerec1 = STAF::Service::My::FileRecord->new();
 
-The fields with default defined will get their default values. all other will left undefined.
+The fields defined as default will be assigned their default values, all other will be left undefined.
 
     $filerec2 = STAF::Service::My::FileRecord->new(name=>"system.ini", owner=>"me");
 
-Fields specified will get that value. Fields that were not specified but have a default
-value, will get the default value. Fields that naither specified nor have default,
+Fields specified will be assigned that value. Fields that were not specified but have a default
+value, will be assigned the default value. Fields that neither specified nor have a default,
 will left undefined. 
 
     $filerec2 = STAF::Service::My::FileRecord->new(name=>"system.ini", size=>70);
 
-...The same.
+=head2 Perl and STAF classes
+
+When instancing a class, it will be blessed to that Perl class. So it is possible
+to define subrotines inside these classes.
+
+However, when a class data is being unmarshalled, it is blessed to Class::STAF::Marshalled,
+and not to its true name, (that can be anything that the sender want) for oblious
+security reasons.
+
+So, if it is needed to find out the name of a locally created class, it is possible
+to use the ref keyword. If it is an unmarshalled class, use the get_staf_class_name function.
 
 =head1 BUGS
 
-Non known.
+None known.
 
-This is a first release - your feedback will be appriciated.
+This is a first release - your feedback will be appreciated.
 
 =head1 SEE ALSO
 
